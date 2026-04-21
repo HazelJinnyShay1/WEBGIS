@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WEBGIS实验作业</title>
+    <script src="https://webapi.amap.com/maps?v=2.0&key=73a4266c177161306f0bfd287b700408&plugin=AMap.PlaceSearch,AMap.Scale"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+
+        .header {
+            height: 60px;
+            background: linear-gradient(90deg, #1377EB, #0A5AB6);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            font-weight: bold;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .container {
+            display: flex;
+            height: calc(100vh - 60px);
+        }
+
+        .sidebar {
+            width: 260px;
+            background: #f5f7fa;
+            border-right: 1px solid #e0e0e0;
+            padding: 15px;
+            overflow-y: auto;
+            z-index: 100;
+        }
+
+        .sidebar h3 {
+            color: #333;
+            margin-bottom: 12px;
+            font-size: 16px;
+            border-left: 4px solid #1377EB;
+            padding-left: 8px;
+        }
+
+        .control-item {
+            margin: 10px 0;
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .control-item label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .control-item button {
+            width: 100%;
+            padding: 8px;
+            margin: 4px 0;
+            background: #1377EB;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .control-item button:hover {
+            background: #0F66CC;
+        }
+
+        #mapContainer {
+            flex: 1;
+            position: relative;
+        }
+
+        #legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.95);
+            padding: 12px;
+            border-radius: 8px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.2);
+            font-size: 14px;
+            z-index: 100;
+        }
+
+        #legend h4 {
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 4px 0;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+            border: 1px solid #999;
+        }
+
+        /* 🔴 搜索框 */
+        #customSearch {
+            position: absolute;
+            top: 15px;
+            left: 30%;
+            transform: translateX(-50%);
+            z-index: 999;
+            background: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+        }
+
+        #customSearch input {
+            border: none;
+            outline: none;
+            width: 180px;
+            padding: 5px;
+            font-size: 14px;
+        }
+
+        #customSearch button {
+            background: #1377EB;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 8px;
+            font-size: 14px;
+        }
+
+        /* 🔴 比例尺 */
+        #scaleBar {
+            position: absolute;
+            bottom: 20px;
+            left: 280px;
+            z-index: 999;
+            background: rgba(255,255,255,0.9);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        /* 🔴 图层列表（放在侧边栏下方） */
+        #layerList {
+            margin-top: 15px;
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        #layerList h4 {
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .layer-item {
+            display: flex;
+            align-items: center;
+            margin: 6px 0;
+            font-size: 13px;
+        }
+
+        .layer-item input {
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        高德地图 + GeoScene图层 实验应用
+    </div>
+
+    <div class="container">
+        <div class="sidebar">
+            <h3>🌍 底图切换</h3>
+            <div class="control-item">
+                <label>选择底图类型</label>
+                <button onclick="switchBaseMap('normal')">标准地图</button>
+                <button onclick="switchBaseMap('satellite')">卫星地图</button>
+            </div>
+
+            <h3 style="margin-top: 20px;">📌 图层控制</h3>
+            <div class="control-item">
+                <label>GeoScene 行政区划图层</label>
+                <button onclick="toggleGeoLayer()">显示/隐藏图层</button>
+            </div>
+
+            <!-- 🔴 图层列表 -->
+            <div id="layerList">
+                <h4>图层列表</h4>
+                <div class="layer-item">
+                    <input type="checkbox" id="layerGeo" checked onchange="toggleGeoLayer()">
+                    <label for="layerGeo">GeoScene 行政区划图层</label>
+                </div>
+                <div class="layer-item">
+                    <input type="checkbox" id="layerBase" checked disabled>
+                    <label for="layerBase">高德底图（标准/卫星）</label>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 20px;">📋 功能说明</h3>
+            <p style="font-size:14px; line-height:1.8; color:#555;">
+                • 高德标准/卫星底图<br>
+                • GeoScene在线行政区划图层<br>
+                • 地点搜索功能<br>
+                • 比例尺控件<br>
+                • 图层列表控制<br>
+                • 自定义图例显示
+            </p>
+        </div>
+
+        <div id="mapContainer">
+            <!-- 🔴 搜索框 -->
+            <div id="customSearch">
+                <input type="text" id="searchInput" placeholder="搜索地点...">
+                <button onclick="searchLocation()">搜索</button>
+            </div>
+
+            <!-- 🔴 比例尺容器 -->
+            <div id="scaleBar"></div>
+
+            <div id="legend">
+                <h4>图例</h4>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #1377EB;"></div>
+                    <span>行政区划边界</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #A0A0A0;"></div>
+                    <span>高德底图道路</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 1. 初始化地图
+        var map = new AMap.Map('mapContainer', {
+            zoom: 5,
+            center: [116.403874, 39.914885],
+            viewMode: '3D',
+        });
+
+        // 2. 底图图层管理
+        var normalLayer = new AMap.TileLayer();
+        var satelliteLayer = new AMap.TileLayer.Satellite();
+        map.add(normalLayer);
+
+        // 3. 🔴 比例尺（添加到左下角）
+        var scale = new AMap.Scale({
+            position: 'LB'
+        });
+        map.addControl(scale);
+        // 把比例尺移动到我们的容器里
+        setTimeout(() => {
+            const scaleDom = document.querySelector('.amap-scale');
+            if (scaleDom) document.getElementById('scaleBar').appendChild(scaleDom);
+        }, 500);
+
+        // 4. 🔴 搜索功能
+        function searchLocation() {
+            var keyword = document.getElementById('searchInput').value.trim();
+            if(!keyword) return alert('请输入搜索内容');
+
+            map.plugin('AMap.PlaceSearch', function() {
+                var placeSearch = new AMap.PlaceSearch({
+                    city: '全国',
+                    map: map
+                });
+
+                placeSearch.search(keyword, function(status, result) {
+                    if (status === 'complete' && result.info === 'OK') {
+                        map.setCenter(result.poiList.pois[0].location);
+                        map.setZoom(15);
+                    } else {
+                        alert('未找到相关地点');
+                    }
+                });
+            });
+        }
+
+        // 5. 底图切换
+        function switchBaseMap(type) {
+            if (type === 'normal') {
+                map.remove(satelliteLayer);
+                map.add(normalLayer);
+            } else {
+                map.remove(normalLayer);
+                map.add(satelliteLayer);
+            }
+        }
+
+        // 6. GeoScene 图层
+        var geoLayer = new AMap.TileLayer({
+            getTileUrl: function(x, y, z) {
+                return "https://services.geosceneonline.cn/arcgis/rest/services/PUBLIC/China_Admin/MapServer/tile/" + z + "/" + y + "/" + x;
+            },
+            zIndex: 10,
+            opacity: 0.6
+        });
+        map.add(geoLayer);
+
+        // 7. 🔴 图层列表控制（和按钮联动）
+        function toggleGeoLayer() {
+            geoLayer.setVisible(!geoLayer.getVisible());
+            // 同步复选框状态
+            document.getElementById('layerGeo').checked = geoLayer.getVisible();
+        }
+    </script>
+</body>
+</html>
